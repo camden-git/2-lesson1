@@ -1,71 +1,82 @@
 package frc.robot.subsystems;
 
 import com.revrobotics.RelativeEncoder;
-import com.revrobotics.spark.SparkMax;
+import com.revrobotics.spark.SparkBase;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
+import com.revrobotics.spark.SparkMax;
+import com.revrobotics.spark.config.SparkBaseConfig;
+import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
+import com.revrobotics.spark.config.SparkMaxConfig;
+
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 
 public class Drivetrain extends SubsystemBase {
 
-    // TODO: Declare four SparkMax motor objects
+    private final SparkMax leftA;
+    private final SparkMax leftB;
+    private final SparkMax rightA;
+    private final SparkMax rightB;
 
+    private final RelativeEncoder leftEncoder;
+    private final RelativeEncoder rightEncoder;
 
-
-    // TODO: Declare encoder objects for left and right leader motors
-
-
-
-    // TODO: Declare a DifferentialDrive object (Hint: it takes left + right leader motors)
-
+    private final DifferentialDrive drive;
 
     public Drivetrain() {
+        leftA = new SparkMax(1, MotorType.kBrushless);
+        leftB = new SparkMax(2, MotorType.kBrushless);
+        rightA = new SparkMax(3, MotorType.kBrushless);
+        rightB = new SparkMax(4, MotorType.kBrushless);
 
-        // TODO: Initialize SparkMax objects using CAN IDs from Constants
-        // (Use MotorType.kBrushless)
+        // NOTE: follow is now part of configureMotor()
+        configureMotor(leftA, false, null);
+        configureMotor(leftB, false, leftA);
 
+        configureMotor(rightA, true, null);
+        configureMotor(rightB, true, rightA);
 
-        // TODO: Configure each motor (write a helper method below to avoid copy/paste)
-        //  - Set idle mode to brake
-        //  - Set current limit (35-45A recommended)
-        //  - Set motor inversion (right side should be inverted)
+        leftEncoder = leftA.getEncoder();
+        rightEncoder = rightA.getEncoder();
 
-
-        // TODO: Make leftB follow leftA
-        // TODO: Make rightB follow rightA
-
-
-        // TODO: Create encoder objects from each leader motor
-        // leftEncoder = leftA.getEncoder();
-        // rightEncoder = rightA.getEncoder();
-
-
-        // TODO: Set encoder conversion factors
-        // Hint: setPositionConversionFactor and setVelocityConversionFactor
-        // same for rightEncoder
-
-
-        // TODO: Initialize DifferentialDrive
+        drive = new DifferentialDrive(leftA, rightA);
     }
 
+    private void configureMotor(SparkMax motor, boolean invert, SparkBase followLeader) {
+        SparkMaxConfig config = new SparkMaxConfig();
+        config.smartCurrentLimit(40);
+        config.inverted(invert);
+        config.idleMode(IdleMode.kBrake);
 
-    // TODO: Write a method "tankDrive(double leftSpeed, double rightSpeed)"
-    // This method should call drive.tankDrive(...)
-    // DO NOT directly call motor.set() here
+        // ✅ Follow Leader
+        if (followLeader != null) {
+            config.follow(followLeader);
+        }
 
+        // ✅ Encoder Conversion Factors *must be set here*
+        double wheelDiameterMeters = 0.1016; // 4" wheel
+        double wheelCircumference = Math.PI * wheelDiameterMeters;
+        double gearReduction = 6.75;
 
-    // TODO: Create accessor methods:
-    // public double getLeftDistanceMeters() 
-    // public double getRightDistanceMeters() 
+        config.encoder.positionConversionFactor(wheelCircumference / gearReduction);
+        config.encoder.velocityConversionFactor((wheelCircumference / gearReduction) / 60.0);
 
+        motor.configure(config, null, null);
+    }
+
+    public void tankDrive(double leftSpeed, double rightSpeed) {
+        drive.tankDrive(leftSpeed, rightSpeed);
+    }
+
+    public double getLeftDistanceMeters() { return leftEncoder.getPosition(); }
+    public double getRightDistanceMeters() { return rightEncoder.getPosition(); }
 
     @Override
     public void periodic() {
-        // TODO: Send encoder data to SmartDashboard
+        SmartDashboard.putNumber("Drive/LeftDistance", getLeftDistanceMeters());
+        SmartDashboard.putNumber("Drive/RightDistance", getRightDistanceMeters());
+        SmartDashboard.putNumber("Drive/LeftVelocity", leftEncoder.getVelocity());
+        SmartDashboard.putNumber("Drive/RightVelocity", rightEncoder.getVelocity());
     }
-
-
-    // OPTIONAL:
-    // Write helper method to set brake/coast modes dynamically
-    // Write method to stop drivetrain (set speeds to 0)
 }
